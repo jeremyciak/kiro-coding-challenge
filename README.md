@@ -1,18 +1,22 @@
-# Events API
+# User Registration API
 
-A serverless REST API for managing events, built with FastAPI and deployed on AWS using Lambda and API Gateway.
+A serverless REST API for user registration with capacity-constrained events and waitlist management, built with FastAPI and deployed on AWS using Lambda and API Gateway.
 
 ## Architecture
 
 - **Backend**: FastAPI with Python 3.11
-- **Database**: DynamoDB
+- **Storage**: In-memory (suitable for MVP/testing)
 - **Infrastructure**: AWS CDK (Python)
 - **Deployment**: API Gateway + Lambda (serverless)
 
 ## Features
 
-- Full CRUD operations for events
-- Query filtering by status
+- User profile management
+- Event creation with capacity constraints
+- User registration with automatic capacity tracking
+- Optional waitlist support for full events
+- Automatic waitlist promotion on unregistration
+- Query user's registered events
 - Input validation with Pydantic
 - CORS enabled for web access
 - Serverless architecture for scalability
@@ -48,67 +52,88 @@ cdk deploy
 
 ## API Usage
 
+### Create User
+```bash
+POST /users
+Content-Type: application/json
+
+{
+  "userId": "alice123",
+  "name": "Alice Johnson"
+}
+```
+
 ### Create Event
 ```bash
 POST /events
 Content-Type: application/json
 
 {
-  "title": "Tech Conference",
-  "description": "Annual tech conference",
-  "date": "2024-12-15",
-  "location": "San Francisco",
-  "capacity": 500,
-  "organizer": "Tech Corp",
-  "status": "active"
+  "eventId": "conf2024",
+  "name": "Tech Conference 2024",
+  "capacity": 100,
+  "hasWaitlist": true
 }
 ```
 
-### List Events
+### Register User for Event
 ```bash
-GET /events
-GET /events?status=active
-```
-
-### Get Event
-```bash
-GET /events/{eventId}
-```
-
-### Update Event
-```bash
-PUT /events/{eventId}
+POST /events/{eventId}/register
 Content-Type: application/json
 
 {
-  "title": "Updated Title",
-  "capacity": 600
+  "userId": "alice123"
 }
 ```
 
-### Delete Event
+### Unregister User from Event
 ```bash
-DELETE /events/{eventId}
+DELETE /events/{eventId}/register/{userId}
 ```
 
-## Event Schema
+### Get User's Registered Events
+```bash
+GET /users/{userId}/events
+```
+
+## Data Schemas
+
+### User Schema
 
 | Field | Type | Required | Validation |
 |-------|------|----------|------------|
-| eventId | string | No (auto-generated) | - |
-| title | string | Yes | 1-200 characters |
-| description | string | Yes | 1-1000 characters |
-| date | string | Yes | YYYY-MM-DD format |
-| location | string | Yes | 1-200 characters |
-| capacity | integer | Yes | Greater than 0 |
-| organizer | string | Yes | 1-200 characters |
-| status | string | Yes | active, inactive, cancelled, or completed |
+| userId | string | Yes | Cannot be empty or whitespace-only |
+| name | string | Yes | Cannot be empty or whitespace-only |
+
+### Event Schema
+
+| Field | Type | Required | Validation |
+|-------|------|----------|------------|
+| eventId | string | Yes | Unique identifier |
+| name | string | Yes | Event name |
+| capacity | integer | Yes | Must be greater than 0 |
+| hasWaitlist | boolean | Yes | Enable/disable waitlist |
+| registered | array | Auto | List of registered user IDs |
+| waitlist | array | Auto | List of waitlisted user IDs |
+
+## Registration Workflow
+
+1. **User Creation**: Create user profiles with unique IDs
+2. **Event Creation**: Set up events with capacity and waitlist settings
+3. **Registration**: Users register for events
+   - If capacity available → added to registered list
+   - If full with waitlist → added to waitlist
+   - If full without waitlist → registration rejected
+4. **Unregistration**: Users can unregister
+   - If registered → removed and first waitlisted user promoted
+   - If waitlisted → removed from waitlist
+5. **Query Events**: Users can view their registered events (excludes waitlisted)
 
 ## Testing
 
-Run the validation test script:
+Run the complete workflow validation test:
 ```bash
-.\test_api.ps1
+.\test_registration_workflow.ps1
 ```
 
 ## Documentation
